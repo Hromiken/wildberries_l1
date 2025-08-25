@@ -1,4 +1,4 @@
-package wildberries_l1
+package main
 
 import "fmt"
 
