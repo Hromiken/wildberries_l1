@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -13,12 +13,12 @@ func main() {
 	var wg sync.WaitGroup
 
 	// Выход по условию
-	stopFlag := false
+	var stopFlag int32
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
-			if stopFlag {
+			if atomic.LoadInt32(&stopFlag) == 1 {
 				fmt.Println("Горутина завершает работу по условию")
 				return
 			}
@@ -27,10 +27,10 @@ func main() {
 		}
 	}()
 	time.Sleep(2 * time.Second)
-	stopFlag = true
+	atomic.StoreInt32(&stopFlag, 1)
 
-	//  Через канал уведомления
-	done := make(chan os.Signal, 1)
+	// Через канал уведомления
+	done := make(chan struct{})
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -67,11 +67,11 @@ func main() {
 	time.Sleep(2 * time.Second)
 	cancel()
 
-	// 4️⃣ runtime.Goexit()
+	// runtime.Goexit()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Println("Горутина вызываем Goexit")
+		fmt.Println("Горутина вызывает Goexit")
 		runtime.Goexit()
 		fmt.Println("Это сообщение не будет напечатано")
 	}()
@@ -92,19 +92,17 @@ func main() {
 	}
 	close(job)
 
-	// Паника / recover
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Println("Горутина поймала панику и завершилась")
-			}
-		}()
-		fmt.Println("Горутина вызывает панику")
-		panic("аварийная ситуация")
-	}()
-
 	wg.Wait()
 	fmt.Println("Все горутины завершены")
 }
+
+/*
+Корректные способы:
+
+
+1) через канал уведомления
+2) через context
+3) по условию (синхронизация обязательна)
+4) через закрытие канала данных
+5) runtime.Goexit() — принудительное завершение
+*/
